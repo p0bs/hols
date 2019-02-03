@@ -4,8 +4,8 @@ library(rvest)
 library(tidyverse)
 library(xml2)
  
-temp_max <- 27
-time_max <- 720
+temp_max <- 270
+time_max <- 7200
 
 index_page_LHR <- 'https://www.flightsfrom.com/LHR/destinations'
 index_page_LGW <- 'https://www.flightsfrom.com/LGW/destinations'
