@@ -4,6 +4,9 @@ library(rvest)
 library(tidyverse)
 library(xml2)
  
+temp_max <- 27
+time_max <- 720
+
 index_page_LHR <- 'https://www.flightsfrom.com/LHR/destinations'
 index_page_LGW <- 'https://www.flightsfrom.com/LGW/destinations'
 
@@ -79,10 +82,32 @@ temp_data <- read_html('https://en.m.wikipedia.org/wiki/List_of_cities_by_averag
 overall <- output %>% 
   left_join(temp_data, by = c('City' = 'City')) %>% 
   select(code, City, Country.x, minutes, ICAO, Latitude, Longitude, UTC, distance, Aug) %>% 
-  filter(!is.na(Aug)) %>% 
+  filter(
+    !is.na(Aug),
+    minutes <= time_max,
+    Aug <= temp_max
+    ) %>% 
   arrange(code) %>% 
   group_by(Country.x, City) %>% 
   slice(1) %>% 
   ungroup() %>% 
   arrange(City)
 
+pal <- colorNumeric(
+  palette = "Reds",
+  domain = overall$Aug)
+
+leaflet(overall) %>% 
+  addTiles() %>% 
+  setView(
+    lng = 15, 
+    lat = 10, 
+    zoom = 2) %>% 
+  addCircles(
+    lng = ~Longitude, 
+    lat = ~Latitude, 
+    weight = 2,
+    radius = ~sqrt(minutes) * 10000, 
+    popup = ~paste(City, "- time: ", round(minutes/60, 1), "hrs; temp: ", Aug, "C"), 
+    color = ~pal(Aug)
+  )
