@@ -42,9 +42,13 @@ output <- data[, c('code', 'city', 'country', 'minutes')] %>%
   rowwise() %>% 
   mutate(distance = airport_distance('LHR', code))
 
-index_page_1 <- 'https://en.m.wikipedia.org/wiki/List_of_cities_by_average_temperature'
-
-temp_data <- read_html(index_page_1) %>%
+temp_data <- read_html('https://en.m.wikipedia.org/wiki/List_of_cities_by_average_temperature') %>%
   html_nodes("table") %>% 
-  html_table(header = TRUE)
+  html_table(header = TRUE) %>% 
+  bind_rows() %>% 
+  select(-Year, -Ref.) %>% 
+  mutate_at(vars(-Country, -City), str_remove, '\\s*\\([^\\)]+\\)') %>% 
+  mutate_at(vars(-Country, -City), as.numeric)
+
+
 
