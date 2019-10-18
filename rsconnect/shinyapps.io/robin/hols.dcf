@@ -1,0 +1,13 @@
+name: hols
+title: hols
+username:
+account: robin
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 736426
+bundleId: 2512285
+url: https://robin.shinyapps.io/hols/
+when: 1571419667.25669
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: app1.R|flight-times.R|leaflet_map.html|README.md|test.Rmd
