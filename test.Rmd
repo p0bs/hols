@@ -1,7 +1,7 @@
 ---
-title: "Test"
+title: "Test logic for hols analysis"
 author: "Robin Penfold"
-date: 3 February 2019
+date: "1st March 2019"
 output:
   html_notebook:
     code_folding: hide
@@ -9,21 +9,18 @@ output:
     theme: sandstone
 ---
 
-Add
-
-```{r, warning=FALSE, message=FALSE}
+```{r libraries, echo=TRUE, warning=FALSE, message=FALSE}
 library(airportr)
 library(crosstalk)
 library(DT)
 library(leaflet)
 library(lubridate)
 library(rvest)
-library(tidyverse)
+suppressMessages(library(tidyverse))
 library(xml2)
- 
-temp_max <- 270
-time_max <- 7200
+```
 
+```{r data, eval=FALSE, echo=TRUE, warning=FALSE, message=FALSE}
 index_page_LHR <- 'https://www.flightsfrom.com/LHR/destinations'
 index_page_LGW <- 'https://www.flightsfrom.com/LGW/destinations'
 
@@ -85,7 +82,7 @@ output <- data[, c('code', 'city', 'home', 'country', 'minutes')] %>%
     Country = str_to_lower(Country)
     )
 
-# 'GlobalLandTemperaturesByCity.csv' downloaded as from https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data#GlobalLandTemperaturesByCity.csv
+# 'GlobalLandTemperaturesByCity.csv' downloaded from https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data#GlobalLandTemperaturesByCity.csv
 
 temp_data1 <- read_csv('GlobalLandTemperaturesByCity.csv') %>% 
   mutate(
@@ -102,26 +99,11 @@ temp_data1 <- read_csv('GlobalLandTemperaturesByCity.csv') %>%
   summarise(temp_av = mean(AverageTemperature, na.rm = TRUE)) %>% 
   ungroup()
 
-# temp_data <- read_html('https://en.m.wikipedia.org/wiki/List_of_cities_by_average_temperature') %>%
-#   html_nodes("table") %>% 
-#   html_table(header = TRUE) %>% 
-#   bind_rows() %>% 
-#   select(-Year, -Ref.) %>% 
-#   mutate_at(vars(-Country, -City), str_remove, '\\s*\\([^\\)]+\\)') %>% 
-#   mutate_at(vars(-Country, -City), as.numeric) %>% 
-#   mutate(
-#     City = str_to_lower(City),
-#     Country = str_to_lower(Country)) %>% 
-#   arrange(City)
-
 overall <- output %>% 
   left_join(temp_data1, by = c('city' = 'City', 'country' = 'Country')) %>% 
   select(code, city, country, minutes, ICAO, Latitude, Longitude, UTC, distance, temp_av) %>% 
   filter(
     !is.na(temp_av)
-    # ,
-    # minutes <= time_max,
-    # Aug <= temp_max
     ) %>% 
   arrange(code) %>% 
   group_by(country, city) %>% 
@@ -131,6 +113,10 @@ overall <- output %>%
   select(country, city, temp_av, minutes, Longitude, Latitude)
 
 # write_rds(x = overall, path = 'overall.rds')
+```
+
+```{r initiate, warning=FALSE, message=FALSE}
+overall <- read_rds('overall.rds')
 
 pal <- colorNumeric(
   palette = "Reds",
@@ -142,7 +128,9 @@ bscols(
   filter_slider("temp", "Temperature", sd, column=~temp_av, step=0.1, width=250),
   filter_slider("duration", "Time", sd, column=~minutes, step=0.1, width=250)
   )
+```
 
+```{r map, warning=FALSE, message=FALSE}
 leaflet(sd) %>% 
   addTiles() %>% 
   setView(
@@ -157,7 +145,9 @@ leaflet(sd) %>%
     popup = ~paste(city, "- time: ", round(minutes/60, 1), "hrs; temp: ", round(temp_av, 2), "C"), 
     color = ~pal(temp_av)
   )
+```
 
+```{r table, warning=FALSE, message=FALSE}
 datatable(
   sd,
   rownames = FALSE,
