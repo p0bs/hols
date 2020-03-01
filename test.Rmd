@@ -99,24 +99,59 @@ temp_data1 <- read_csv('GlobalLandTemperaturesByCity.csv') %>%
   summarise(temp_av = mean(AverageTemperature, na.rm = TRUE)) %>% 
   ungroup()
 
+temp_data2 <- read_csv('GlobalLandTemperaturesByCity.csv') %>% 
+  mutate(
+    year = year(dt),
+    month = month(dt),
+    City = str_to_lower(City),
+    Country = str_to_lower(Country)
+  ) %>% 
+  filter(
+    year > 2000
+    ) %>% 
+  group_by(City, Country, month) %>% 
+  summarise(temp_av = mean(AverageTemperature, na.rm = TRUE)) %>% 
+  ungroup()
+
 overall <- output %>% 
-  left_join(temp_data1, by = c('city' = 'City', 'country' = 'Country')) %>% 
-  select(code, city, country, minutes, ICAO, Latitude, Longitude, UTC, distance, temp_av) %>% 
+  left_join(temp_data2, by = c('city' = 'City', 'country' = 'Country')) %>% 
+  select(code, city, country, month, minutes, ICAO, Latitude, Longitude, UTC, distance, temp_av) %>% 
   filter(
     !is.na(temp_av)
     ) %>% 
+  mutate(
+    minutes = round(minutes, 0),
+    temp_av = round(temp_av, 0),
+    Latitude = round(Latitude, 2),
+    Longitude = round(Longitude, 2),
+    month_label = case_when(
+      month == 1 ~ "01 - January",
+      month == 2 ~ "02 - February",
+      month == 3 ~ "03 - March",
+      month == 4 ~ "04 - April",
+      month == 5 ~ "05 - May",
+      month == 6 ~ "06 - June",
+      month == 7 ~ "07 - July",
+      month == 8 ~ "08 - August",
+      month == 9 ~ "09 - September",
+      month == 10 ~ "10 - October",
+      month == 11 ~ "11 - November",
+      month == 12 ~ "12 - December",
+      TRUE ~ NA_character_
+      )
+    ) %>% 
   arrange(code) %>% 
-  group_by(country, city) %>% 
+  group_by(country, city, month_label) %>% 
   slice(1) %>% 
   ungroup() %>% 
-  arrange(city) %>% 
-  select(country, city, temp_av, minutes, Longitude, Latitude)
+  arrange(city, month) %>% 
+  select(country, city, month_label, temp_av, minutes, Longitude, Latitude)
 
 # write_rds(x = overall, path = 'overall.rds')
 ```
 
 ```{r initiate, warning=FALSE, message=FALSE}
-overall <- read_rds('overall.rds')
+# overall <- read_rds('overall.rds')
 
 pal <- colorNumeric(
   palette = "Reds",
@@ -125,13 +160,14 @@ pal <- colorNumeric(
 sd <- SharedData$new(overall)
 
 bscols(
-  filter_slider("temp", "Temperature", sd, column=~temp_av, step=0.1, width=250),
-  filter_slider("duration", "Time", sd, column=~minutes, step=0.1, width=250)
+  filter_slider("temp", "Temperature", sd, column=~temp_av, step=1, width=100),
+  filter_slider("duration", "Time", sd, column=~minutes, step=1, width=100),
+  filter_select("mon", "Month", sd, group=~month_label, multiple = FALSE)
   )
 ```
 
 ```{r map, warning=FALSE, message=FALSE}
-leaflet(sd) %>% 
+output_map <- leaflet(sd) %>% 
   addTiles() %>% 
   setView(
     lng = 15, 
@@ -148,17 +184,30 @@ leaflet(sd) %>%
 ```
 
 ```{r table, warning=FALSE, message=FALSE}
-datatable(
+output_table <- datatable(
   sd,
   rownames = FALSE,
-  colnames = c('city', 'country', 'minutes', 'temperature' = 'temp_av'),
+  colnames = c('city', 'country', 'minutes', 'temperature' = 'temp_av', 'month' = 'month_label'),
   extensions="Scroller", 
   style="bootstrap", 
   class="compact", 
   width="100%",
-  options=list(deferRender=TRUE, scrollY=300, scroller=TRUE)
+  options=list(
+    dom = 'tip',
+    deferRender=TRUE, 
+    scrollY=300, 
+    scroller=TRUE
+    )
   ) %>% 
-  DT::formatRound(columns = c(3, 4, 5, 6), digits = 0)
+  formatRound(
+    columns = c(3, 4, 5, 6), 
+    digits = 0
+    )
+```
+
+
+```{r combined, warning=FALSE, message=FALSE}
+bscols(output_map, output_table)
 ```
 
 Add
