@@ -16,7 +16,6 @@ library(airportr)
 library(crosstalk)
 library(DT)
 library(leaflet)
-library(lubridate)
 library(rvest)
 library(tidyverse)
 library(xml2)
@@ -81,65 +80,43 @@ output <- data[, c('code', 'city', 'home', 'country', 'minutes')] %>%
   rowwise() %>% 
   mutate(
     distance = airport_distance(home, code),
-    City = str_to_lower(City), 
-    Country = str_to_lower(Country)
+    City = str_to_lower(City)
     )
 
-# 'GlobalLandTemperaturesByCity.csv' downloaded as from https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data#GlobalLandTemperaturesByCity.csv
-
-temp_data1 <- read_csv('GlobalLandTemperaturesByCity.csv') %>% 
+temp_data <- read_html('https://en.m.wikipedia.org/wiki/List_of_cities_by_average_temperature') %>%
+  html_nodes("table") %>% 
+  html_table(header = TRUE) %>% 
+  bind_rows() %>% 
+  select(-Year, -Ref.) %>% 
+  mutate_at(vars(-Country, -City), str_remove, '\\s*\\([^\\)]+\\)') %>% 
+  mutate_at(vars(-Country, -City), as.numeric) %>% 
   mutate(
-    year = year(dt),
-    month = month(dt),
     City = str_to_lower(City),
-    Country = str_to_lower(Country)
-  ) %>% 
-  filter(
-    year > 2000,
-    month == 8
-    ) %>% 
-  group_by(City, Country) %>% 
-  summarise(temp_av = mean(AverageTemperature, na.rm = TRUE)) %>% 
-  ungroup()
-
-# temp_data <- read_html('https://en.m.wikipedia.org/wiki/List_of_cities_by_average_temperature') %>%
-#   html_nodes("table") %>% 
-#   html_table(header = TRUE) %>% 
-#   bind_rows() %>% 
-#   select(-Year, -Ref.) %>% 
-#   mutate_at(vars(-Country, -City), str_remove, '\\s*\\([^\\)]+\\)') %>% 
-#   mutate_at(vars(-Country, -City), as.numeric) %>% 
-#   mutate(
-#     City = str_to_lower(City),
-#     Country = str_to_lower(Country)) %>% 
-#   arrange(City)
+    Country = str_to_lower(Country)) %>% 
+  arrange(City)
 
 overall <- output %>% 
-  left_join(temp_data1, by = c('city' = 'City', 'country' = 'Country')) %>% 
-  select(code, city, country, minutes, ICAO, Latitude, Longitude, UTC, distance, temp_av) %>% 
+  left_join(temp_data, by = c('City' = 'City')) %>% 
+  select(code, City, Country.x, minutes, ICAO, Latitude, Longitude, UTC, distance, Aug) %>% 
   filter(
-    !is.na(temp_av)
-    # ,
-    # minutes <= time_max,
-    # Aug <= temp_max
+    !is.na(Aug),
+    minutes <= time_max,
+    Aug <= temp_max
     ) %>% 
   arrange(code) %>% 
-  group_by(country, city) %>% 
+  group_by(Country.x, City) %>% 
   slice(1) %>% 
   ungroup() %>% 
-  arrange(city) %>% 
-  select(country, city, temp_av, minutes, Longitude, Latitude)
-
-# write_rds(x = overall, path = 'overall.rds')
+  arrange(City)
 
 pal <- colorNumeric(
   palette = "Reds",
-  domain = overall$temp_av)
+  domain = overall$Aug)
 
 sd <- SharedData$new(overall)
 
 bscols(
-  filter_slider("temp", "Temperature", sd, column=~temp_av, step=0.1, width=250),
+  filter_slider("temp", "Temperature", sd, column=~Aug, step=0.1, width=250),
   filter_slider("duration", "Time", sd, column=~minutes, step=0.1, width=250)
   )
 
@@ -154,21 +131,18 @@ leaflet(sd) %>%
     lat = ~Latitude, 
     weight = 2,
     radius = ~sqrt(minutes) * 10000, 
-    popup = ~paste(city, "- time: ", round(minutes/60, 1), "hrs; temp: ", round(temp_av, 2), "C"), 
-    color = ~pal(temp_av)
+    popup = ~paste(City, "- time: ", round(minutes/60, 1), "hrs; temp: ", Aug, "C"), 
+    color = ~pal(Aug)
   )
 
 datatable(
-  sd,
-  rownames = FALSE,
-  colnames = c('city', 'country', 'minutes', 'temperature' = 'temp_av'),
+  sd, 
   extensions="Scroller", 
   style="bootstrap", 
   class="compact", 
   width="100%",
   options=list(deferRender=TRUE, scrollY=300, scroller=TRUE)
-  ) %>% 
-  DT::formatRound(columns = c(3, 4, 5, 6), digits = 0)
+  )
 ```
 
 Add

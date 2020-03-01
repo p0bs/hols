@@ -1,14 +1,14 @@
 library(shiny)
+library(crosstalk)
 library(DT)
 library(leaflet)
 library(tidyverse)
 
-# See test.Rmd for more details
 overall <- read_rds(path = "overall.rds")
 
 pal <- colorNumeric(
     palette = "Reds",
-    domain = overall$temp_av)
+    domain = overall$Aug)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -24,7 +24,7 @@ ui <- fluidPage(
             width = 4,
             offset = 1,
             sliderInput("temp",
-                        "Average Temperature in August (C)", 
+                        "Temperature", 
                         min = 0,
                         max = 40,
                         value = c(15, 25), 
@@ -43,8 +43,6 @@ ui <- fluidPage(
                         dragRange = TRUE)
             )
         ),
-    
-    br(),
 
         # Show a plot of the generated distribution
         fluidRow(
@@ -54,7 +52,7 @@ ui <- fluidPage(
             ),
             column(
                 width = 4, 
-                DTOutput("table_output")
+                dataTableOutput("table_output")
             )
         ), 
     br()
@@ -67,7 +65,7 @@ server <- function(input, output) {
         overall %>% 
             filter(
                 between(
-                    temp_av, input$temp[1], input$temp[2]
+                    Aug, input$temp[1], input$temp[2]
                     ),
                 between(
                     minutes, input$duration[1], input$duration[2]
@@ -79,42 +77,41 @@ server <- function(input, output) {
         leaflet(new_data()) %>% 
             addTiles() %>% 
             setView(
-                lng = -30, 
-                lat = 30, 
-                zoom = 2) %>% 
+                lng = -25, 
+                lat = 45, 
+                zoom = 3) %>% 
             addCircles(
                 lng = ~Longitude, 
                 lat = ~Latitude, 
                 weight = 2,
                 radius = ~sqrt(minutes) * 10000, 
-                popup = ~paste(city, "- time: ", round(minutes/60, 1), "hrs; temp: ", round(temp_av, 1), "C"), 
-                color = ~pal(temp_av)
+                popup = ~paste(City, "- time: ", round(minutes/60, 1), "hrs; temp: ", Aug, "C"), 
+                color = ~pal(Aug)
             )
     })
     
-    output$table_output <- renderDT ({
+    output$table_output <- renderDataTable ({
         datatable(
-            new_data() %>%
+            new_data() %>% 
                 select(
-                    City = 'city',
-                    Time = 'minutes',
-                    Temperature = 'temp_av'
-                    ),
+                    City = 'City', 
+                    Time = 'minutes', 
+                    Temp = 'Aug'
+                    ), 
             rownames = FALSE,
-            extensions="Scroller",
-            style="bootstrap",
-            class="compact",
-            width="100%",
+            # extensions="Scroller", 
+            # style="bootstrap", 
+            # class="compact", 
+            # width="100%",
             options=list(
                 pageLength = 3,
-                dom = 'tip',
-                deferRender=TRUE,
-                scrollY=300,
+                dom = 'tp',
+                deferRender=TRUE, 
+                scrollY=300, 
                 scroller=TRUE
                 )
-            ) %>% 
-            formatRound(columns = 3, digits = 0)
-        })
+        )
+    })
 }
 
 # Run the application 
